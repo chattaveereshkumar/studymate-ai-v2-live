@@ -1,0 +1,10 @@
+{
+  "name": "StudyMate AI",
+  "short_name": "StudyMate",
+  "description": "Your personal study workspace",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#10182f",
+  "icons": []
+}

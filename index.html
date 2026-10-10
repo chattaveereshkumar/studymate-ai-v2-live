@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10182f">
+  <title>StudyMate AI — Your personal study workspace</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <main id="authView" class="auth-shell">
+    <section class="auth-card">
+      <div class="brand-mark">SM</div>
+      <p class="eyebrow">YOUR PERSONAL STUDY WORKSPACE</p>
+      <h1>Study smarter.<br><span>Grow every day.</span></h1>
+      <p class="muted">Plan your semester, build consistent habits, and learn with your AI study companion.</p>
+      <div class="auth-tabs">
+        <button class="tab active" data-auth-tab="login">Log in</button>
+        <button class="tab" data-auth-tab="signup">Create account</button>
+      </div>
+      <form id="authForm">
+        <div id="nameField" class="field hidden"><label for="authName">Full name</label><input id="authName" autocomplete="name" placeholder="Your name"></div>
+        <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required></div>
+        <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" placeholder="At least 6 characters" required></div>
+        <button class="primary full" type="submit" id="authSubmit">Log in</button>
+      </form>
+      <p class="tiny muted">Demo mode stores this prototype's data in this browser only. For secure multi-user accounts, connect Supabase using the setup guide.</p>
+    </section>
+    <aside class="auth-art">
+      <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
+      <div class="art-note"><span class="note-icon">✦</span><div><b>One focused session at a time</b><p>Small steps become big results.</p></div></div>
+      <div class="art-stat"><span>WEEKLY FOCUS</span><strong>Make it count.</strong><div class="fake-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    </aside>
+  </main>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="StudyMate home"><span class="brand-mark small">SM</span><span>StudyMate <em>AI</em></span></a>
+      <div class="side-label">WORKSPACE</div>
+      <nav id="nav">
+        <button class="nav-item active" data-page="dashboard"><span>⌂</span> Dashboard</button>
+        <button class="nav-item" data-page="subjects"><span>▤</span> Subjects</button>
+        <button class="nav-item" data-page="exams"><span>◷</span> Exams</button>
+        <button class="nav-item" data-page="timetable"><span>▦</span> Timetable</button>
+        <button class="nav-item" data-page="assistant"><span>✧</span> AI Assistant</button>
+        <button class="nav-item" data-page="progress"><span>↗</span> Progress</button>
+        <button class="nav-item" data-page="profile"><span>◎</span> My profile</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="mini-avatar" id="sideAvatar">S</div><div class="user-mini"><b id="sideName">Student</b><span id="sideEmail">student@example.com</span></div><button id="logoutBtn" class="icon-btn" title="Log out" aria-label="Log out">↪</button></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><div><p class="eyebrow" id="pageEyebrow">YOUR OVERVIEW</p><h1 id="pageTitle">Dashboard</h1></div><div class="top-actions"><button id="themeBtn" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">☾</button><div class="date-chip" id="todayLabel"></div></div></header>
+      <section id="pageContent" class="page-content"></section>
+      <footer class="footer-note">StudyMate AI <span>·</span> Your progress, one session at a time.</footer>
+    </main>
+  </div>
+  <dialog id="itemDialog" class="modal">
+    <form method="dialog" id="itemForm">
+      <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">WORKSPACE</p><h2 id="modalTitle">Add item</h2></div><button class="icon-btn" value="cancel" aria-label="Close">×</button></div>
+      <div id="modalFields"></div>
+      <div class="modal-actions"><button class="secondary" value="cancel">Cancel</button><button class="primary" id="modalSave" value="save">Save</button></div>
+    </form>
+  </dialog>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
