@@ -1,43 +1,461 @@
 (() => {
   "use strict";
-  const $ = (s, root=document) => root.querySelector(s);
-  const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+
+  const $ = (s, root = document) => root.querySelector(s);
+  const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const storeKey = "studymate-v2-demo";
-  let authMode = "login", currentUser = null, page = "dashboard", modalKind = null, editId = null;
-  let timerSeconds = 25*60, timerInterval = null;
-  const defaults = () => ({profile:{name:"Student",email:"student@example.com",college:"",course:"B.Tech CSE",year:"2nd Year",semester:"",studyHours:3,preferredTime:"Evening"},subjects:[],exams:[],tasks:[],sessions:[],messages:[]});
-  let data = defaults();
-  const titles = {dashboard:["YOUR OVERVIEW","Dashboard"],subjects:["YOUR LEARNING","Subjects"],exams:["STAY PREPARED","Exams"],timetable:["YOUR ROUTINE","Timetable"],assistant:["LEARN SOMETHING NEW","AI Assistant"],progress:["YOUR CONSISTENCY","Progress"],profile:["YOUR DETAILS","My profile"]};
-  function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2800)}
-  function escapeHtml(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-  function load(){try{const all=JSON.parse(localStorage.getItem(storeKey)||"{}");const email=localStorage.getItem("studymate-demo-user");if(email&&all[email]){currentUser=email;data={...defaults(),...all[email]};showApp()}}catch(e){console.warn(e)}}
-  function persist(){if(!currentUser)return;let all={};try{all=JSON.parse(localStorage.getItem(storeKey)||"{}")}catch(e){}all[currentUser]=data;localStorage.setItem(storeKey,JSON.stringify(all))}
-  function showApp(){ $("#authView").classList.add("hidden");$("#appView").classList.remove("hidden");$("#sideName").textContent=data.profile.name||"Student";$("#sideEmail").textContent=currentUser||data.profile.email;$("#sideAvatar").textContent=(data.profile.name||"S").slice(0,1).toUpperCase();$("#todayLabel").textContent=new Intl.DateTimeFormat(undefined,{weekday:"short",month:"short",day:"numeric"}).format(new Date());renderPage(); }
-  function showAuth(){ $("#appView").classList.add("hidden");$("#authView").classList.remove("hidden"); }
-  function setAuthMode(mode){authMode=mode;$$("[data-auth-tab]").forEach(b=>b.classList.toggle("active",b.dataset.authTab===mode));$("#nameField").classList.toggle("hidden",mode!=="signup");$("#authSubmit").textContent=mode==="signup"?"Create account":"Log in";$("#authPassword").autocomplete=mode==="signup"?"new-password":"current-password"}
-  $$("[data-auth-tab]").forEach(b=>b.addEventListener("click",()=>setAuthMode(b.dataset.authTab)));
-  $("#authForm").addEventListener("submit",e=>{e.preventDefault();const email=$("#authEmail").value.trim().toLowerCase(),pass=$("#authPassword").value,name=$("#authName").value.trim();if(pass.length<6)return toast("Use at least 6 characters for this demo password.");let all={};try{all=JSON.parse(localStorage.getItem(storeKey)||"{}")}catch(e){}
-    if(authMode==="signup"){if(all[email])return toast("An account exists in this browser. Please log in.");data=defaults();data.profile.name=name||email.split("@")[0];data.profile.email=email;all[email]=data;localStorage.setItem(storeKey,JSON.stringify(all));localStorage.setItem("studymate-demo-passwords",JSON.stringify({...JSON.parse(localStorage.getItem("studymate-demo-passwords")||"{}"),[email]:pass}));currentUser=email;localStorage.setItem("studymate-demo-user",email);toast("Demo account created.");showApp()}
-    else{if(!all[email])return toast("No demo account found in this browser. Choose Create account.");let passwords={};try{passwords=JSON.parse(localStorage.getItem("studymate-demo-passwords")||"{}")}catch(e){}if(passwords[email]!==pass)return toast("Email or password doesn't match this demo account.");currentUser=email;data={...defaults(),...all[email]};localStorage.setItem("studymate-demo-user",email);showApp()}
+
+  let authMode = "login";
+  let currentUser = null;
+  let page = "dashboard";
+  let modalKind = null;
+  let editId = null;
+  let timerSeconds = 25 * 60;
+  let timerInterval = null;
+
+  const defaults = () => ({
+    profile: {
+      name: "Student",
+      email: "student@example.com",
+      college: "",
+      course: "B.Tech CSE",
+      year: "2nd Year",
+      semester: "",
+      studyHours: 3,
+      preferredTime: "Evening"
+    },
+    subjects: [],
+    exams: [],
+    tasks: [],
+    sessions: [],
+    messages: []
   });
-  $("#logoutBtn").addEventListener("click",()=>{persist();localStorage.removeItem("studymate-demo-user");currentUser=null;showAuth();toast("Logged out of this browser demo.")});
-  $("#themeBtn").addEventListener("click",()=>{document.body.classList.toggle("dark");localStorage.setItem("sm-theme",document.body.classList.contains("dark")?"dark":"light")});
-  if(localStorage.getItem("sm-theme")==="dark")document.body.classList.add("dark");
-  $("#nav").addEventListener("click",e=>{const b=e.target.closest("[data-page]");if(!b)return;page=b.dataset.page;renderPage()});
-  function setPageHeader(){const t=titles[page]||titles.dashboard;$("#pageEyebrow").textContent=t[0];$("#pageTitle").textContent=t[1];$$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page))}
-  function empty(title,desc){return `<div class="empty-state"><div style="font-size:28px">✦</div><strong>${title}</strong><p>${desc}</p></div>`}
-  function cardActions(type,id){return `<div class="item-actions"><button data-edit="${type}:${id}">Edit</button><button data-delete="${type}:${id}">Delete</button></div>`}
-  function addButton(type,label){return `<button class="primary" data-add="${type}">＋ ${label}</button>`}
-  function stat(label,value,sub,icon){return `<div class="stat-card"><div class="stat-top"><span>${label}</span><span class="stat-icon">${icon}</span></div><div class="stat-value">${value}</div><div class="stat-sub">${sub}</div></div>`}
-  function renderDashboard(){const hours=(data.sessions||[]).reduce((n,s)=>n+(Number(s.minutes)||0),0)/60;const upcoming=(data.exams||[]).filter(x=>x.date&&new Date(x.date)>=new Date(new Date().toDateString())).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4);const tasks=(data.tasks||[]).filter(t=>!t.done).slice(0,5);const subjectHtml=data.subjects.length?data.subjects.slice(0,4).map((s,i)=>`<div class="subject-row"><div class="subject-color">${escapeHtml((s.name||"S").slice(0,1).toUpperCase())}</div><div class="subject-info"><b>${escapeHtml(s.name)}</b><small>${escapeHtml(s.code||"Subject")}</small><div class="progress-line" style="margin-top:8px"><span style="width:${Math.min(100,Number(s.progress)||0)}%"></span></div></div><span class="subject-percent">${Number(s.progress)||0}%</span></div>`).join(""):empty("Your subjects start here","Add your first subject to organize your learning.");return `<div class="welcome-row"><div><h2>Welcome back, ${escapeHtml(data.profile.name||"Student")} 👋</h2><p>Keep showing up. Your future self will thank you.</p></div>${addButton("task","Add task")}</div><div class="stats-grid">${stat("SUBJECTS",data.subjects.length,"In your workspace","▤")}${stat("UPCOMING EXAMS",upcoming.length,"On your calendar","◷")}${stat("FOCUS HOURS",hours.toFixed(1),"Tracked total","◉")}${stat("OPEN TASKS",tasks.length,"Ready for your next step","✓")}</div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>Subject progress</h3><p>A little progress every day adds up.</p></div><button class="text-btn" data-goto="subjects">View all</button></div>${subjectHtml}</div><div class="panel"><div class="panel-head"><div><h3>Next up</h3><p>Upcoming exams and tasks</p></div><button class="text-btn" data-goto="exams">Exams</button></div>${upcoming.length?upcoming.map(e=>`<div class="task-row"><div class="stat-icon">◷</div><div class="task-main"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(e.date)} · ${escapeHtml(e.subject||"General")}</small></div></div>`).join(""):"<p class='muted' style='font-size:11px'>No upcoming exams yet.</p>"}<div class="panel-head" style="margin-top:22px"><div><h3>My next actions</h3><p>Keep your momentum</p></div></div>${tasks.length?tasks.map(t=>`<div class="task-row"><input type="checkbox" data-task-done="${t.id}" ${t.done?"checked":""}><div class="task-main"><b>${escapeHtml(t.title)}</b><small>${escapeHtml(t.when||"Today")}</small></div></div>`).join(""):"<p class='muted' style='font-size:11px'>Add a task to start your daily plan.</p>"}</div></div>`}
-  function renderSubjects(){return `<div class="section-head"><div><h2>Your subjects</h2><p>Keep topics and progress in one place.</p></div>${addButton("subject","Add subject")}</div>${data.subjects.length?`<div class="item-grid">${data.subjects.map(s=>`<article class="item-card"><div class="subject-color">${escapeHtml((s.name||"S").slice(0,1).toUpperCase())}</div><h3>${escapeHtml(s.name)}</h3><p>${escapeHtml(s.description||"No notes added yet.")}</p><div class="progress-line"><span style="width:${Math.min(100,Number(s.progress)||0)}%"></span></div><div class="item-meta"><span>${escapeHtml(s.code||"Subject")} · ${Number(s.progress)||0}% complete</span>${cardActions("subject",s.id)}</div></article>`).join("")}</div>`:empty("No subjects yet","Add a subject to start tracking your semester.")}`}
-  function renderExams(){return `<div class="section-head"><div><h2>Exam planner</h2><p>Know what's coming and prepare early.</p></div>${addButton("exam","Add exam")}</div>${data.exams.length?`<div class="item-grid">${data.exams.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(x=>`<article class="item-card"><span class="pill">${escapeHtml(x.subject||"General")}</span><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.notes||"Make a revision plan and practice questions.")}</p><div class="item-meta"><span>◷ ${escapeHtml(x.date||"Date not set")}</span>${cardActions("exam",x.id)}</div></article>`).join("")}</div>`:empty("No exams added","Add your next exam and give yourself time to prepare.")}`}
-  function renderTimetable(){const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];return `<div class="section-head"><div><h2>Timetable & daily tasks</h2><p>Make a realistic plan you can follow.</p></div>${addButton("task","Add task")}</div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>My tasks</h3><p>Check items off as you finish them.</p></div></div>${data.tasks.length?data.tasks.map(t=>`<div class="task-row"><input type="checkbox" data-task-done="${t.id}" ${t.done?"checked":""}><div class="task-main"><b>${escapeHtml(t.title)}</b><small>${escapeHtml(t.when||"Today")} · ${escapeHtml(t.subject||"General")}</small></div><span class="pill">${t.done?"DONE":"TODO"}</span>${cardActions("task",t.id)}</div>`).join(""):empty("Your plan is empty","Add a task for the next study session.")}</div><div class="panel"><div class="panel-head"><div><h3>Focus timer</h3><p>Try 25 minutes of focus, then take a break.</p></div></div><div class="timer-face"><span class="pill">POMODORO</span><strong id="timerDisplay">25:00</strong><div class="timer-controls"><button class="primary" id="timerStart">Start</button><button class="secondary" id="timerReset">Reset</button></div></div><p class="muted" style="font-size:11px;text-align:center">When you finish, log a session to track your progress.</p><button class="secondary full" data-add="session">＋ Log study session</button></div></div>`}
+
+  let data = defaults();
+
+  const titles = {
+    dashboard: ["YOUR OVERVIEW", "Dashboard"],
+    subjects: ["YOUR LEARNING", "Subjects"],
+    exams: ["STAY PREPARED", "Exams"],
+    timetable: ["YOUR ROUTINE", "Timetable"],
+    assistant: ["LEARN SOMETHING NEW", "AI Assistant"],
+    progress: ["YOUR CONSISTENCY", "Progress"],
+    profile: ["YOUR DETAILS", "My profile"]
+  };
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  function escapeHtml(s = "") {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[c]));
+  }
+
+  function load() {
+    try {
+      const all = JSON.parse(localStorage.getItem(storeKey) || "{}");
+      const email = localStorage.getItem("studymate-demo-user");
+
+      if (email && all[email]) {
+        currentUser = email;
+        data = { ...defaults(), ...all[email] };
+        showApp();
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
+  function persist() {
+    if (!currentUser) return;
+
+    let all = {};
+
+    try {
+      all = JSON.parse(localStorage.getItem(storeKey) || "{}");
+    } catch (e) {}
+
+    all[currentUser] = data;
+    localStorage.setItem(storeKey, JSON.stringify(all));
+  }
+
+  function showApp() {
+    $("#authView").classList.add("hidden");
+    $("#appView").classList.remove("hidden");
+    $("#sideName").textContent = data.profile.name || "Student";
+    $("#sideEmail").textContent = currentUser || data.profile.email;
+    $("#sideAvatar").textContent =
+      (data.profile.name || "S").slice(0, 1).toUpperCase();
+
+    $("#todayLabel").textContent = new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }).format(new Date());
+
+    renderPage();
+  }
+
+  function showAuth() {
+    $("#appView").classList.add("hidden");
+    $("#authView").classList.remove("hidden");
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+
+    $$("[data-auth-tab]").forEach(b =>
+      b.classList.toggle("active", b.dataset.authTab === mode)
+    );
+
+    $("#nameField").classList.toggle("hidden", mode !== "signup");
+    $("#authSubmit").textContent =
+      mode === "signup" ? "Create account" : "Log in";
+
+    $("#authPassword").autocomplete =
+      mode === "signup" ? "new-password" : "current-password";
+  }
+
+  $$("[data-auth-tab]").forEach(b =>
+    b.addEventListener("click", () => setAuthMode(b.dataset.authTab))
+  );
+
+  $("#authForm").addEventListener("submit", e => {
+    e.preventDefault();
+
+    const email = $("#authEmail").value.trim().toLowerCase();
+    const pass = $("#authPassword").value;
+    const name = $("#authName").value.trim();
+
+    if (pass.length < 6) {
+      return toast("Use at least 6 characters for this demo password.");
+    }
+
+    let all = {};
+
+    try {
+      all = JSON.parse(localStorage.getItem(storeKey) || "{}");
+    } catch (e) {}
+
+    if (authMode === "signup") {
+      if (all[email]) {
+        return toast("An account exists in this browser. Please log in.");
+      }
+
+      data = defaults();
+      data.profile.name = name || email.split("@")[0];
+      data.profile.email = email;
+
+      all[email] = data;
+
+      localStorage.setItem(storeKey, JSON.stringify(all));
+
+      let passwords = {};
+
+      try {
+        passwords = JSON.parse(
+          localStorage.getItem("studymate-demo-passwords") || "{}"
+        );
+      } catch (e) {}
+
+      passwords[email] = pass;
+
+      localStorage.setItem(
+        "studymate-demo-passwords",
+        JSON.stringify(passwords)
+      );
+
+      currentUser = email;
+      localStorage.setItem("studymate-demo-user", email);
+
+      toast("Demo account created.");
+      showApp();
+    } else {
+      if (!all[email]) {
+        return toast(
+          "No demo account found in this browser. Choose Create account."
+        );
+      }
+
+      let passwords = {};
+
+      try {
+        passwords = JSON.parse(
+          localStorage.getItem("studymate-demo-passwords") || "{}"
+        );
+      } catch (e) {}
+
+      if (passwords[email] !== pass) {
+        return toast("Email or password doesn't match this demo account.");
+      }
+
+      currentUser = email;
+      data = { ...defaults(), ...all[email] };
+
+      localStorage.setItem("studymate-demo-user", email);
+      showApp();
+    }
+  });
+
+  $("#logoutBtn").addEventListener("click", () => {
+    persist();
+    localStorage.removeItem("studymate-demo-user");
+    currentUser = null;
+    showAuth();
+    toast("Logged out of this browser demo.");
+  });
+
+  $("#themeBtn").addEventListener("click", () => {
+    document.body.classList.toggle("dark");
+
+    localStorage.setItem(
+      "sm-theme",
+      document.body.classList.contains("dark") ? "dark" : "light"
+    );
+  });
+
+  if (localStorage.getItem("sm-theme") === "dark") {
+    document.body.classList.add("dark");
+  }
+
+  $("#nav").addEventListener("click", e => {
+    const b = e.target.closest("[data-page]");
+    if (!b) return;
+
+    page = b.dataset.page;
+    renderPage();
+  });
+
+  function setPageHeader() {
+    const t = titles[page] || titles.dashboard;
+
+    $("#pageEyebrow").textContent = t[0];
+    $("#pageTitle").textContent = t[1];
+
+    $$(".nav-item").forEach(b =>
+      b.classList.toggle("active", b.dataset.page === page)
+    );
+  }
+
+  function empty(title, desc) {
+    return `<div class="empty-state">
+      <div style="font-size:28px">✦</div>
+      <strong>${title}</strong>
+      <p>${desc}</p>
+    </div>`;
+  }
+
+  function cardActions(type, id) {
+    return `<div class="item-actions">
+      <button data-edit="${type}:${id}">Edit</button>
+      <button data-delete="${type}:${id}">Delete</button>
+    </div>`;
+  }
+
+  function addButton(type, label) {
+    return `<button class="primary" data-add="${type}">＋ ${label}</button>`;
+  }
+
+  function stat(label, value, sub, icon) {
+    return `<div class="stat-card">
+      <div class="stat-top">
+        <span>${label}</span>
+        <span class="stat-icon">${icon}</span>
+      </div>
+      <div class="stat-value">${value}</div>
+      <div class="stat-sub">${sub}</div>
+    </div>`;
+  }
+
+  function renderDashboard() {
+    const hours = (data.sessions || []).reduce(
+      (n, s) => n + (Number(s.minutes) || 0),
+      0
+    ) / 60;
+
+    const upcoming = (data.exams || [])
+      .filter(x =>
+        x.date && new Date(x.date) >= new Date(new Date().toDateString())
+      )
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4);
+
+    const tasks = (data.tasks || []).filter(t => !t.done).slice(0, 5);
+
+    const subjectHtml = data.subjects.length
+      ? data.subjects.slice(0, 4).map(s => `
+          <div class="subject-row">
+            <div class="subject-color">
+              ${escapeHtml((s.name || "S").slice(0, 1).toUpperCase())}
+            </div>
+            <div class="subject-info">
+              <b>${escapeHtml(s.name)}</b>
+              <small>${escapeHtml(s.code || "Subject")}</small>
+              <div class="progress-line" style="margin-top:8px">
+                <span style="width:${Math.min(100, Number(s.progress) || 0)}%"></span>
+              </div>
+            </div>
+            <span class="subject-percent">${Number(s.progress) || 0}%</span>
+          </div>
+        `).join("")
+      : empty(
+          "Your subjects start here",
+          "Add your first subject to organize your learning."
+        );
+
+    return `<div class="welcome-row">
+      <div>
+        <h2>Welcome back, ${escapeHtml(data.profile.name || "Student")} 👋</h2>
+        <p>Keep showing up. Your future self will thank you.</p>
+      </div>
+      ${addButton("task", "Add task")}
+    </div>
+
+    <div class="stats-grid">
+      ${stat("SUBJECTS", data.subjects.length, "In your workspace", "▤")}
+      ${stat("UPCOMING EXAMS", upcoming.length, "On your calendar", "◷")}
+      ${stat("FOCUS HOURS", hours.toFixed(1), "Tracked total", "◉")}
+      ${stat("OPEN TASKS", tasks.length, "Ready for your next step", "✓")}
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Subject progress</h3>
+            <p>A little progress every day adds up.</p>
+          </div>
+          <button class="text-btn" data-goto="subjects">View all</button>
+        </div>
+        ${subjectHtml}
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Next up</h3>
+            <p>Upcoming exams and tasks</p>
+          </div>
+          <button class="text-btn" data-goto="exams">Exams</button>
+        </div>
+
+        ${upcoming.length
+          ? upcoming.map(e => `
+              <div class="task-row">
+                <div class="stat-icon">◷</div>
+                <div class="task-main">
+                  <b>${escapeHtml(e.name)}</b>
+                  <small>${escapeHtml(e.date)} · ${escapeHtml(e.subject || "General")}</small>
+                </div>
+              </div>
+            `).join("")
+          : "<p class='muted' style='font-size:11px'>No upcoming exams yet.</p>"
+        }
+
+        <div class="panel-head" style="margin-top:22px">
+          <div>
+            <h3>My next actions</h3>
+            <p>Keep your momentum</p>
+          </div>
+        </div>
+
+        ${tasks.length
+          ? tasks.map(t => `
+              <div class="task-row">
+                <input type="checkbox" data-task-done="${t.id}" ${t.done ? "checked" : ""}>
+                <div class="task-main">
+                  <b>${escapeHtml(t.title)}</b>
+                  <small>${escapeHtml(t.when || "Today")}</small>
+                </div>
+              </div>
+            `).join("")
+          : "<p class='muted' style='font-size:11px'>Add a task to start your daily plan.</p>"
+        }
+      </div>
+    </div>`;
+  }
+
+  function renderSubjects() {
+    return `<div class="section-head">
+      <div>
+        <h2>Your subjects</h2>
+        <p>Keep topics and progress in one place.</p>
+      </div>
+      ${addButton("subject", "Add subject")}
+    </div>
+
+    ${data.subjects.length
+      ? `<div class="item-grid">
+          ${data.subjects.map(s => `
+            <article class="item-card">
+              <div class="subject-color">
+                ${escapeHtml((s.name || "S").slice(0, 1).toUpperCase())}
+              </div>
+              <h3>${escapeHtml(s.name)}</h3>
+              <p>${escapeHtml(s.description || "No notes added yet.")}</p>
+              <div class="progress-line">
+                <span style="width:${Math.min(100, Number(s.progress) || 0)}%"></span>
+              </div>
+              <div class="item-meta">
+                <span>${escapeHtml(s.code || "Subject")} · ${Number(s.progress) || 0}% complete</span>
+                ${cardActions("subject", s.id)}
+              </div>
+            </article>
+          `).join("")}
+        </div>`
+      : empty("No subjects yet", "Add a subject to start tracking your semester.")
+    }`;
+  }
+
+  function renderExams() {
+    return `<div class="section-head">
+      <div>
+        <h2>Exam planner</h2>
+        <p>Know what's coming and prepare early.</p>
+      </div>
+      ${addButton("exam", "Add exam")}
+    </div>
+
+    ${data.exams.length
+      ? `<div class="item-grid">
+          ${data.exams.slice().sort((a, b) =>
+            (a.date || "").localeCompare(b.date || "")
+          ).map(x => `
+            <article class="item-card">
+              <span class="pill">${escapeHtml(x.subject || "General")}</span>
+              <h3>${escapeHtml(x.name)}</h3>
+              <p>${escapeHtml(x.notes || "Make a revision plan and practice questions.")}</p>
+              <div class="item-meta">
+                <span>◷ ${escapeHtml(x.date || "Date not set")}</span>
+                ${cardActions("exam", x.id)}
+              </div>
+            </article>
+          `).join("")}
+        </div>`
+      : empty("No exams added", "Add your next exam and give yourself time to prepare.")
+    }`;
+  }
+    function renderTimetable(){return `<div class="section-head"><div><h2>Timetable & daily tasks</h2><p>Make a realistic plan you can follow.</p></div><div>${addButton("task","Add task")} <button class="primary" id="generatePlanBtn">Generate study plan</button></div></div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>My tasks</h3><p>Check items off as you finish them.</p></div></div>${data.tasks.length?data.tasks.map(t=>`<div class="task-row"><input type="checkbox" data-task-done="${t.id}" ${t.done?"checked":""}><div class="task-main"><b>${escapeHtml(t.title)}</b><small>${escapeHtml(t.when||"Today")} · ${escapeHtml(t.subject||"General")}</small></div><span class="pill">${t.done?"DONE":"TODO"}</span>${cardActions("task",t.id)}</div>`).join(""):empty("Your plan is empty","Generate a study plan or add a task.")}</div><div class="panel"><div class="panel-head"><div><h3>Focus timer</h3><p>Try 25 minutes of focus, then take a break.</p></div></div><div class="timer-face"><span class="pill">POMODORO</span><strong id="timerDisplay">25:00</strong><div class="timer-controls"><button class="primary" id="timerStart">Start</button><button class="secondary" id="timerReset">Reset</button></div></div><p class="muted" style="font-size:11px;text-align:center">When you finish, log a session to track your progress.</p><button class="secondary full" data-add="session">＋ Log study session</button></div></div>`}
+
   function renderAssistant(){const messages=data.messages||[];return `<div class="section-head"><div><h2>General learning assistant</h2><p>Ask about programming, maths, science, or study strategies.</p></div></div><div class="assistant-layout"><div class="panel chat-panel"><div class="chat-messages" id="chatMessages">${messages.length?messages.map(m=>`<div class="chat-bubble ${m.role==="user"?"user":"bot"}">${escapeHtml(m.text)}</div>`).join(""):`<div class="chat-bubble bot">Hi! I'm your StudyMate demo assistant. I can show example study guidance, but real AI answers need an AI model connection. Try asking about recursion, exam planning, or focus techniques.</div>`}</div><form class="chat-form" id="chatForm"><input id="chatInput" placeholder="Ask a learning question..." required><button class="primary">Send</button></form></div><div class="panel"><div class="panel-head"><div><h3>Try asking</h3><p>Example prompts</p></div></div><button class="suggestion" data-prompt="Explain recursion in Java with a simple example.">Explain recursion in Java</button><button class="suggestion" data-prompt="Create a 7-day exam revision plan.">Create a 7-day revision plan</button><button class="suggestion" data-prompt="Give me 5 beginner questions on OOP in Java.">Practice OOP questions</button><button class="suggestion" data-prompt="How can I study with focus for 25 minutes?">Improve my focus</button><p class="tiny muted">This starter project does not call an AI API or invent an AI response. Connect a secure backend AI provider for real generated answers.</p></div></div>`}
+
   function renderProgress(){const minutes=data.sessions.reduce((n,s)=>n+(Number(s.minutes)||0),0),done=data.tasks.filter(t=>t.done).length,total=data.tasks.length,progress=total?Math.round(done/total*100):0;return `<div class="section-head"><div><h2>Your progress</h2><p>Celebrate consistency, not just perfect days.</p></div>${addButton("session","Log session")}</div><div class="stats-grid">${stat("FOCUS TIME",(minutes/60).toFixed(1)+" h","Total recorded","◉")}${stat("TASKS COMPLETED",done,`Out of ${total} tasks`,"✓")}${stat("TASK COMPLETION",progress+"%","Based on your task list","↗")}${stat("SUBJECTS",data.subjects.length,"Learning areas","▤")}</div><div class="two-col"><div class="panel"><div class="panel-head"><div><h3>Subject progress</h3><p>Update completion from your subject cards.</p></div></div>${data.subjects.length?data.subjects.map(s=>`<div class="subject-row"><div class="subject-info"><b>${escapeHtml(s.name)}</b><div class="progress-line" style="margin-top:8px"><span style="width:${Number(s.progress)||0}%"></span></div></div><span class="subject-percent">${Number(s.progress)||0}%</span></div>`).join(""):empty("No subjects to track","Add subjects to see your progress here.")}</div><div class="panel"><div class="panel-head"><div><h3>Recent study sessions</h3><p>Sessions you've logged</p></div></div>${data.sessions.length?data.sessions.slice(-6).reverse().map(s=>`<div class="task-row"><div class="stat-icon">◉</div><div class="task-main"><b>${escapeHtml(s.subject||"Study session")}</b><small>${escapeHtml(s.date||"Today")}</small></div><span class="pill">${Number(s.minutes)||0} min</span></div>`).join(""):"<p class='muted' style='font-size:11px'>Your logged sessions will appear here.</p>"}</div></div>`}
+
   function renderProfile(){const p=data.profile;return `<div class="section-head"><div><h2>Student profile</h2><p>Personalize your workspace and daily plan.</p></div></div><div class="profile-grid"><div class="panel"><form id="profileForm"><div class="field"><label>Full name</label><input name="name" value="${escapeHtml(p.name)}" required></div><div class="field"><label>Email</label><input value="${escapeHtml(p.email)}" disabled></div><div class="field"><label>College</label><input name="college" value="${escapeHtml(p.college)}" placeholder="College or university"></div><div class="field"><label>Course</label><input name="course" value="${escapeHtml(p.course)}" placeholder="e.g. B.Tech CSE"></div><div class="field"><label>Year</label><select name="year">${["1st Year","2nd Year","3rd Year","4th Year","Other"].map(v=>`<option ${p.year===v?"selected":""}>${v}</option>`).join("")}</select></div><div class="field"><label>Semester</label><input name="semester" value="${escapeHtml(p.semester)}" placeholder="e.g. 3"></div><div class="field"><label>Available study hours per day</label><input name="studyHours" type="number" min="0" max="18" value="${Number(p.studyHours)||3}"></div><div class="field"><label>Preferred study time</label><select name="preferredTime">${["Morning","Afternoon","Evening","Night","Flexible"].map(v=>`<option ${p.preferredTime===v?"selected":""}>${v}</option>`).join("")}</select></div><button class="primary">Save profile</button></form></div><div class="panel"><div class="panel-head"><div><h3>Privacy & data</h3><p>Know where your demo data lives.</p></div></div><p class="muted" style="font-size:12px">This starter build stores data in this browser's local storage. It is not secure multi-user authentication and data won't automatically sync between devices.</p><p class="muted" style="font-size:12px">For production, connect Supabase Auth and database policies. Keep privileged keys on a server, never in browser JavaScript.</p><button class="secondary" id="exportData">Export my data (JSON)</button><button class="secondary full" id="clearData">Clear this demo account's data</button></div></div>`}
+
   function renderPage(){setPageHeader();const render={dashboard:renderDashboard,subjects:renderSubjects,exams:renderExams,timetable:renderTimetable,assistant:renderAssistant,progress:renderProgress,profile:renderProfile};$("#pageContent").innerHTML=(render[page]||renderDashboard)();wirePage()}
-  function wirePage(){ $$("[data-add]").forEach(b=>b.addEventListener("click",()=>openModal(b.dataset.add)));$$("[data-goto]").forEach(b=>b.addEventListener("click",()=>{page=b.dataset.goto;renderPage()}));$$("[data-edit]").forEach(b=>b.addEventListener("click",()=>{const [type,id]=b.dataset.edit.split(":");openModal(type,id)}));$$("[data-delete]").forEach(b=>b.addEventListener("click",()=>{const [type,id]=b.dataset.delete.split(":");if(!confirm("Delete this item?"))return;const key=type==="subject"?"subjects":type==="exam"?"exams":type==="task"?"tasks":"sessions";data[key]=data[key].filter(x=>String(x.id)!==id);persist();renderPage();toast("Item deleted.")}));$$("[data-task-done]").forEach(b=>b.addEventListener("change",()=>{const t=data.tasks.find(x=>String(x.id)===b.dataset.taskDone);if(t)t.done=b.checked;persist();renderPage()}));
+
+  function wirePage(){ if($("#generatePlanBtn"))$("#generatePlanBtn").addEventListener("click",generateStudyPlan); $$("[data-add]").forEach(b=>b.addEventListener("click",()=>openModal(b.dataset.add)));$$("[data-goto]").forEach(b=>b.addEventListener("click",()=>{page=b.dataset.goto;renderPage()}));$$("[data-edit]").forEach(b=>b.addEventListener("click",()=>{const [type,id]=b.dataset.edit.split(":");openModal(type,id)}));$$("[data-delete]").forEach(b=>b.addEventListener("click",()=>{const [type,id]=b.dataset.delete.split(":");if(!confirm("Delete this item?"))return;const key=type==="subject"?"subjects":type==="exam"?"exams":type==="task"?"tasks":"sessions";data[key]=data[key].filter(x=>String(x.id)!==id);persist();renderPage();toast("Item deleted.")}));$$("[data-task-done]").forEach(b=>b.addEventListener("change",()=>{const t=data.tasks.find(x=>String(x.id)===b.dataset.taskDone);if(t)t.done=b.checked;persist();renderPage()}));
     if($("#profileForm"))$("#profileForm").addEventListener("submit",e=>{e.preventDefault();const f=new FormData(e.target);["name","college","course","year","semester","studyHours","preferredTime"].forEach(k=>data.profile[k]=f.get(k));data.profile.studyHours=Number(data.profile.studyHours)||0;persist();showApp();toast("Profile saved.")});
     if($("#exportData"))$("#exportData").addEventListener("click",()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="studymate-data.json";a.click();URL.revokeObjectURL(a.href)});
     if($("#clearData"))$("#clearData").addEventListener("click",()=>{if(!confirm("Clear all saved demo data for this account?"))return;data=defaults();persist();renderPage();toast("Demo data cleared.")});
@@ -55,6 +473,40 @@
   };
   function openModal(type,id=null){modalKind=type;editId=id;const map={subject:"subjects",exam:"exams",task:"tasks",session:"sessions"};const key=map[type];const existing=id?data[key].find(x=>String(x.id)===id):null;$("#modalTitle").textContent=(id?"Edit ":"Add ")+({subject:"subject",exam:"exam",task:"task",session:"study session"}[type]);$("#modalFields").innerHTML=fields[type].map(([name,label,kind,required])=>{const val=existing?.[name]??(name==="progress"?0:name==="minutes"?25:name==="date"?new Date().toISOString().slice(0,10):"");if(kind==="textarea")return `<div class="field"><label>${label}</label><textarea name="${name}" rows="3">${escapeHtml(val)}</textarea></div>`;return `<div class="field"><label>${label}</label><input name="${name}" type="${kind}" value="${escapeHtml(val)}" ${required?"required":""} ${name==="progress"?'min="0" max="100"':""} ${name==="minutes"?'min="1" max="1440"':""}></div>`}).join("");$("#itemDialog").showModal()}
   $("#itemForm").addEventListener("submit",e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();const f=new FormData(e.target),obj={};for(const [k,v] of f.entries())obj[k]=v;for(const k of ["progress","minutes"])if(k in obj)obj[k]=Number(obj[k])||0;const key={subject:"subjects",exam:"exams",task:"tasks",session:"sessions"}[modalKind];if(editId){const i=data[key].findIndex(x=>String(x.id)===editId);if(i>=0)data[key][i]={...data[key][i],...obj}}else data[key].push({id:Date.now(),done:false,...obj});persist();$("#itemDialog").close();renderPage();toast("Saved successfully.")});
-  $("#itemDialog").addEventListener("click",e=>{if(e.target===$("#itemDialog"))$("#itemDialog").close()});
+    $("#itemDialog").addEventListener("click",e=>{if(e.target===$("#itemDialog"))$("#itemDialog").close()});
+
+  function generateStudyPlan(){
+    if(!data.subjects.length){toast("Please add your subjects first.");page="subjects";renderPage();return;}
+    const hours=Math.max(0,Number(data.profile.studyHours)||0);
+    if(hours===0){toast("Set your daily study hours in My profile.");page="profile";renderPage();return;}
+    const subjects=[...data.subjects].sort((a,b)=>{
+      const examA=data.exams.find(e=>e.subject?.toLowerCase()===a.name?.toLowerCase());
+      const examB=data.exams.find(e=>e.subject?.toLowerCase()===b.name?.toLowerCase());
+      if(examA&&examB)return (examA.date||"9999-12-31").localeCompare(examB.date||"9999-12-31");
+      if(examA)return -1;
+      if(examB)return 1;
+      return (Number(a.progress)||0)-(Number(b.progress)||0);
+    });
+    const totalMinutes=Math.round(hours*60);
+    const baseMinutes=Math.floor(totalMinutes/subjects.length);
+    let remaining=totalMinutes%subjects.length;
+    const tasks=subjects.map(subject=>{
+      const minutes=baseMinutes+(remaining-->0?1:0);
+      return {
+        id:Date.now()+Math.random(),
+        title:`Study ${subject.name}`,
+        subject:subject.name,
+        when:`${data.profile.preferredTime||"Flexible"} · ${minutes} minutes`,
+        done:false,
+        generatedPlan:true
+      };
+    });
+    data.tasks=[...data.tasks.filter(t=>t.done||!t.generatedPlan),...tasks];
+    persist();
+    page="timetable";
+    renderPage();
+    toast("Your study plan is ready!");
+  }
+
   load();
 })();
